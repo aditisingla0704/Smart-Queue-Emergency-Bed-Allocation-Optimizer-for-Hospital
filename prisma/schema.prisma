@@ -1,0 +1,131 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  name         String
+  role         String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  patients     Patient[]
+  auditLogs    AuditLog[]
+  allocations  BedAllocation[]
+}
+
+model Patient {
+  id               String          @id @default(cuid())
+  name             String?
+  tempId           String?
+  age              Int
+  sex              String
+  chiefComplaint   String
+  triageLevel      Int
+  vitals           String
+  isolationNeed    Boolean         @default(false)
+  equipment        String          @default("[]")
+  flags            String          @default("{}")
+  status           String          @default("WAITING")
+  priorityScore    Float           @default(0)
+  queuedAt         DateTime        @default(now())
+  seenAt           DateTime?
+  admittedAt       DateTime?
+  dischargedAt     DateTime?
+  bedId            String?         @unique
+  assignedDoctorId String?
+  isSimulation     Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  bed              Bed?            @relation(fields: [bedId], references: [id])
+  assignedDoctor   User?           @relation(fields: [assignedDoctorId], references: [id])
+  allocations      BedAllocation[]
+
+  @@index([status])
+  @@index([isSimulation])
+  @@index([bedId])
+  @@index([assignedDoctorId])
+}
+
+model Ward {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  genderPolicy String   @default("ANY")
+  isSimulation Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  beds         Bed[]
+
+  @@index([type])
+  @@index([isSimulation])
+}
+
+model Bed {
+  id             String          @id @default(cuid())
+  code           String          @unique
+  wardId         String
+  status         String          @default("AVAILABLE")
+  equipment      String          @default("[]")
+  isIsolation    Boolean         @default(false)
+  currentGender  String?
+  isSimulation   Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  ward           Ward            @relation(fields: [wardId], references: [id])
+  patient        Patient?
+  allocations    BedAllocation[]
+
+  @@index([wardId])
+  @@index([status])
+  @@index([isSimulation])
+}
+
+model BedAllocation {
+  id                String   @id @default(cuid())
+  patientId         String
+  bedId             String
+  suggestedBySystem Boolean  @default(true)
+  confirmedById     String?
+  status            String   @default("SUGGESTED")
+  optimizerMethod   String?
+  explanation       String?
+  overrideReason    String?
+  isSimulation      Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  bed               Bed      @relation(fields: [bedId], references: [id])
+  confirmedBy       User?    @relation(fields: [confirmedById], references: [id])
+
+  @@index([patientId])
+  @@index([bedId])
+  @@index([status])
+  @@index([isSimulation])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  details    String   @default("{}")
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+}
+
+model SurgeConfig {
+  id        String   @id @default(cuid())
+  wardType  String   @unique
+  threshold Int      @default(85)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
