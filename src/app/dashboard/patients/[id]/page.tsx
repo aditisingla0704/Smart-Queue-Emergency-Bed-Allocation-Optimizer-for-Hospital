@@ -1,6 +1,6 @@
 'use client';
 
-import React, { use, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, User, Activity, Clock, Bed } from 'lucide-react';
 
@@ -10,28 +10,90 @@ type Modal = null | 'status' | 'vitals' | 'bed';
 const BEDS = ['ICU-01', 'ICU-02', 'ER-03', 'ER-04', 'GEN-05', 'GEN-06'];
 const STATUSES = ['WAITING', 'IN_TREATMENT', 'ADMITTED', 'DISCHARGED'];
 
-export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-
-  const patient = {
+const PATIENTS: Record<
+  string,
+  {
+    displayId: string;
+    name: string;
+    age: number;
+    sex: string;
+    triageLevel: number;
+    status: string;
+    chiefComplaint: string;
+    vitals: Vitals;
+  }
+> = {
+  '1': {
     displayId: 'P-101',
     name: 'John Doe',
     age: 45,
     sex: 'Male',
     triageLevel: 1,
+    status: 'WAITING',
     chiefComplaint: 'Severe chest pain radiating to left arm.',
-  };
+    vitals: { hr: 110, bp: '160/95', temp: 37.2, o2: 94, rr: 22 },
+  },
+  '2': {
+    displayId: 'P-102',
+    name: 'Jane Smith',
+    age: 32,
+    sex: 'Female',
+    triageLevel: 2,
+    status: 'WAITING',
+    chiefComplaint: 'Abdominal pain since last night.',
+    vitals: { hr: 88, bp: '120/80', temp: 37.5, o2: 98, rr: 18 },
+  },
+  '3': {
+    displayId: 'P-103',
+    name: 'Alice Johnson',
+    age: 67,
+    sex: 'Female',
+    triageLevel: 3,
+    status: 'ADMITTED',
+    chiefComplaint: 'Fall at home, hip pain.',
+    vitals: { hr: 76, bp: '135/85', temp: 36.9, o2: 96, rr: 16 },
+  },
+};
 
-  const [waitStartTime] = useState(() => new Date(Date.now() - 1000 * 60 * 45).toISOString());
-  const [status, setStatus] = useState('WAITING');
+export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const patient = PATIENTS[id] ?? PATIENTS['1'];
+  const storageKey = `patient-${id}`;
+
+  const [waitStart, setWaitStart] = useState('');
+  const [status, setStatus] = useState(patient.status);
   const [assignedBed, setAssignedBed] = useState<string | null>(null);
-  const [vitals, setVitals] = useState<Vitals>({ hr: 110, bp: '160/95', temp: 37.2, o2: 94, rr: 22 });
+  const [vitals, setVitals] = useState<Vitals>(patient.vitals);
+  const [loaded, setLoaded] = useState(false);
 
   const [modal, setModal] = useState<Modal>(null);
-  const [statusDraft, setStatusDraft] = useState('WAITING');
+  const [statusDraft, setStatusDraft] = useState(patient.status);
   const [bedDraft, setBedDraft] = useState(BEDS[0]);
   const [vitalsDraft, setVitalsDraft] = useState({ hr: '', bp: '', temp: '', o2: '', rr: '' });
   const [message, setMessage] = useState('');
+
+  // Load saved changes from the browser
+  useEffect(() => {
+    setWaitStart(new Date(Date.now() - 1000 * 60 * 45).toISOString());
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.status) setStatus(d.status);
+        if (d.assignedBed) setAssignedBed(d.assignedBed);
+        if (d.vitals) setVitals(d.vitals);
+      }
+    } catch {}
+    setLoaded(true);
+  }, [storageKey]);
+
+  // Save changes to the browser
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ status, assignedBed, vitals }));
+    } catch {}
+  }, [loaded, storageKey, status, assignedBed, vitals]);
 
   const openStatus = () => {
     setStatusDraft(status);
@@ -83,7 +145,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
 
   return (
-    <div className="space-y-6" data-patient-id={id}>
+    <div className="space-y-6">
       <div className="flex items-center space-x-4">
         <Link href="/dashboard/patients" className="text-gray-500 hover:text-gray-900">
           <ArrowLeft size={20} />
@@ -183,7 +245,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <Clock size={16} className="mr-2" /> Waiting Since
                 </div>
                 <span className="font-medium text-gray-900">
-                  {new Date(waitStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {waitStart
+                    ? new Date(waitStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : '-'}
                 </span>
               </div>
 
@@ -279,7 +343,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             {modal === 'bed' && (
               <>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Assign Bed Manually</h3>
-                <p className="text-sm text-gray-500 mb-4">{patient.name} ({patient.displayId})</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  {patient.name} ({patient.displayId})
+                </p>
                 <label className={labelClass}>Select bed</label>
                 <select value={bedDraft} onChange={(e) => setBedDraft(e.target.value)} className={inputClass}>
                   {BEDS.map((b) => (
