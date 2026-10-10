@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
+import { signIn } from 'next-auth/react';
 import { Activity, AlertCircle } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -21,20 +22,26 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     try {
-      // Validate input using Zod
       loginSchema.parse({ email, password });
-      
+
       setIsLoading(true);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // For demonstration, accept any valid format credentials
-      // In a real app, this would be an actual authentication call
+
+      const res = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (!res || res.error) {
+        setError('Invalid email or password');
+        setIsLoading(false);
+        return;
+      }
+
       router.push('/dashboard');
-      
+      router.refresh();
     } catch (err) {
       if (err instanceof z.ZodError) {
         setError(err.errors[0].message);
@@ -67,7 +74,6 @@ export default function LoginPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            
             {error && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4">
                 <div className="flex items-center">
@@ -123,7 +129,7 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-          
+
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -136,7 +142,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div className="mt-6 text-sm text-center text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
-              <p>Any valid email and password will work</p>
+              <p>Use the demo accounts provided</p>
               <p>for this academic demonstration.</p>
             </div>
           </div>
