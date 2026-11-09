@@ -1,4 +1,8 @@
-import { auth } from "./lib/auth"
+
+import NextAuth from "next-auth";
+import authConfig from "../auth.config";
+
+const { auth } = NextAuth(authConfig);
 
 export const publicRoutes = [
   "/",
@@ -10,29 +14,24 @@ export const publicRoutes = [
   "/login",
 ];
 
-export const publicApiRoutes = [
-  "/api/auth",
-];
-
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
 
   const isPublicRoute = publicRoutes.includes(nextUrl.pathname);
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
-  const isApiRoute = nextUrl.pathname.startsWith("/api");
 
   if (isApiAuthRoute) {
     return;
   }
 
   if (!isLoggedIn && !isPublicRoute) {
-    let callbackUrl = nextUrl.pathname;
-    if (nextUrl.search) {
-      callbackUrl += nextUrl.search;
-    }
-    const encodedCallbackUrl = encodeURIComponent(callbackUrl);
-    return Response.redirect(new URL(`/login?callbackUrl=${encodedCallbackUrl}`, nextUrl));
+    const callbackUrl = nextUrl.pathname + nextUrl.search;
+
+    const loginUrl = new URL("/login", nextUrl);
+    loginUrl.searchParams.set("callbackUrl", callbackUrl);
+
+    return Response.redirect(loginUrl);
   }
 
   return;
